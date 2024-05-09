@@ -15,6 +15,6 @@ For an in-depth explanation on what tominecon.7z is and everything known about i
 
 ### How do I use this?
 
-To use tominecon.7z cracker, open a terminal in the directory of the executable and type `./tominecon_cracker.exe <PATH_TO_TOMINECON.7Z>`
+To use tominecon.7z cracker, open a terminal in the directory of the executable and type `./tominecon_cracker.exe <PATH_TO_TOMINECON.7Z> [NUMBER_OF_THREADS]`
 
 The way this works is incredibly inefficient. I made this in the span of like 10 minutes so if anyone has any suggestions to make it faster or thinks the code to the archive may actually be something else, feel free to share.
