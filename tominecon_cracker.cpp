@@ -10,22 +10,29 @@ const int GREEN = 10;
 const int RED = 12;
 const int DEFAULT_GRAY = 7;
 
-std::string PROGRAM_FINISH = "";
+std::string FINAL_MESSAGE = "";
+int FINAL_COLOR = 0;
 
-CRITICAL_SECTION consoleCriticalSection; // for console output synchronization
-HANDLE passwordFoundEvent; // event to signal when password is found
-volatile bool passwordFound = false; // variable to indicate whether the password is found
+CRITICAL_SECTION consoleCriticalSection; // For console output synchronization
+HANDLE passwordFoundEvent; // Event to signal when password is found
+volatile bool passwordFound = false; // Variable to indicate whether the password is found
 
 void setConsoleColor(int color) {
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     SetConsoleTextAttribute(hConsole, color);
 }
 
+void finalMessage(const std::string& message, int color) {
+    setConsoleColor(color);
+    std::cout << std::endl << message << std::endl;
+    setConsoleColor(DEFAULT_GRAY);
+}
+
 void bruteForceThread(int length, const std::string& filePath, int threadId, int totalThreads) {
-    // Calculate the starting index for this thread's range
+    // Calculate the starting index for this thread
     int startIndex = threadId - 1;
 
-    while (!passwordFound) { // continue until password found
+    while (!passwordFound) { // Continue until password found
         // Generate the combination
         int combination = startIndex;
         std::string combinationString = std::to_string(combination);
@@ -35,20 +42,17 @@ void bruteForceThread(int length, const std::string& filePath, int threadId, int
         std::cout << std::endl << "Thread " << threadId << ": Trying code: " << combinationString << std::endl;
         LeaveCriticalSection(&consoleCriticalSection);
 
-        // Try the combination
+        // Try combination using 7z command
         std::string command = "7z x -p" + combinationString + " \"" + filePath + "\" -y > nul";
         int result = system(command.c_str());
 
-        // If password is found, set the flag and print the result
+        // We found the password
         if (result == 0) {
             EnterCriticalSection(&consoleCriticalSection);
             SetEvent(passwordFoundEvent);
-            setConsoleColor(GREEN);
-            PROGRAM_FINISH = "Thread " + std::to_string(threadId) + ": Password found: " + combinationString;
-            std::cout << std::endl << PROGRAM_FINISH;
-            setConsoleColor(DEFAULT_GRAY);
+            FINAL_MESSAGE = "Thread " + std::to_string(threadId) + ": Password found: " + combinationString;
+            FINAL_COLOR = GREEN;
             LeaveCriticalSection(&consoleCriticalSection);
-            passwordFound = true;
             return;
         }
 
@@ -57,17 +61,16 @@ void bruteForceThread(int length, const std::string& filePath, int threadId, int
         if (startIndex >= 10000000000000000) break; // Break if we've exhausted all combinations
     }
 
-    // If password not found, print failure message
+    // We didn't find the password (cringe)
     EnterCriticalSection(&consoleCriticalSection);
-    setConsoleColor(RED);
-    PROGRAM_FINISH = "Thread " + std::to_string(threadId) + ": Password not found.";
-    std::cout << std::endl << PROGRAM_FINISH;
-    setConsoleColor(DEFAULT_GRAY);
+    if (!passwordFound) {
+        FINAL_MESSAGE = "Thread " + std::to_string(threadId) + ": Password not found.";
+        FINAL_COLOR = RED;
+    }
     LeaveCriticalSection(&consoleCriticalSection);
 }
 
 void bruteForce(int length, const std::string& filePath, int totalThreads) {
-    // Create threads
     std::vector<std::thread> threads;
     threads.reserve(totalThreads);
 
@@ -87,13 +90,15 @@ void bruteForce(int length, const std::string& filePath, int totalThreads) {
     for (auto& thread : threads) {
         thread.join();
     }
+
+    finalMessage(FINAL_MESSAGE, FINAL_COLOR);
 }
 
 int main(int argc, char* argv[]) {
     InitializeCriticalSection(&consoleCriticalSection);
     passwordFoundEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
-    // Check for .7z path input
+    // Dheck for .7z path input
     if (argc < 2) {
         std::cerr << "Usage: " << argv[0] << " <path_to_7z_file> [number_of_threads]" << std::endl;
         return 1;
@@ -116,7 +121,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    int length = 16; // Length of the combination
+    int length = 16; // We assume this is supposed to be 16
     bruteForce(length, filePath, totalThreads);
 
     // Cleanup
