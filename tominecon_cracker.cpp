@@ -28,14 +28,13 @@ void finalMessage(const std::string& message, int color) {
     setConsoleColor(DEFAULT_GRAY);
 }
 
-void bruteForceThread(int length, const std::string& filePath, int threadId, int totalThreads) {
+void bruteForceThread(int length, const std::string& filePath, int threadId, int totalThreads, int start, int end) {
     // Calculate the starting index for this thread
-    int startIndex = threadId - 1;
+    int startIndex = start + (threadId - 1);
 
     while (!passwordFound) { // Continue until password found
         // Generate the combination
-        int combination = startIndex;
-        std::string combinationString = std::to_string(combination);
+        std::string combinationString = std::to_string(startIndex);
         combinationString = std::string(length - combinationString.length(), '0') + combinationString;
 
         EnterCriticalSection(&consoleCriticalSection);
@@ -45,6 +44,11 @@ void bruteForceThread(int length, const std::string& filePath, int threadId, int
         // Try combination using 7z command
         std::string command = "7z x -p" + combinationString + " \"" + filePath + "\" -y > nul";
         int result = system(command.c_str());
+
+        if (startIndex >= end) {
+            SetEvent(passwordFoundEvent);
+            break;
+        }
 
         // We found the password
         if (result == 0) {
@@ -61,7 +65,7 @@ void bruteForceThread(int length, const std::string& filePath, int threadId, int
         if (startIndex >= 10000000000000000) break; // Break if we've exhausted all combinations
     }
 
-    // We didn't find the password (cringe)
+    // We didn't find the password or reached end index
     EnterCriticalSection(&consoleCriticalSection);
     if (!passwordFound) {
         FINAL_MESSAGE = "Thread " + std::to_string(threadId) + ": Password not found.";
@@ -70,14 +74,15 @@ void bruteForceThread(int length, const std::string& filePath, int threadId, int
     LeaveCriticalSection(&consoleCriticalSection);
 }
 
-void bruteForce(int length, const std::string& filePath, int totalThreads) {
+
+void bruteForce(int length, const std::string& filePath, int totalThreads, int start, int end) {
     std::vector<std::thread> threads;
     threads.reserve(totalThreads);
 
     // Create and start threads
     for (int i = 1; i <= totalThreads; ++i) {
         // Start each thread at its respective index
-        threads.emplace_back(bruteForceThread, length, filePath, i, totalThreads);
+        threads.emplace_back(bruteForceThread, length, filePath, i, totalThreads, start, end);
     }
 
     // Wait for any thread to find the password or for all threads to finish
@@ -98,9 +103,9 @@ int main(int argc, char* argv[]) {
     InitializeCriticalSection(&consoleCriticalSection);
     passwordFoundEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
 
-    // Dheck for .7z path input
+    // Check for .7z path input
     if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <path_to_7z_file> [number_of_threads]" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <path_to_7z_file> [number_of_threads] [start_index] [end_index]" << std::endl;
         return 1;
     }
 
@@ -122,7 +127,35 @@ int main(int argc, char* argv[]) {
     }
 
     int length = 16; // We assume this is supposed to be 16
-    bruteForce(length, filePath, totalThreads);
+
+    int start = 0; // Default start index
+    int end = 9999999999999999; // Default end index
+
+    if (argc >= 4) {
+        try {
+            start = std::stoi(argv[3]);
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Invalid start index: " << argv[3] << ". Defaulting to 0." << std::endl;
+            start = 0;
+        }
+    }
+
+    if (argc >= 5) {
+        try {
+            end = std::stoi(argv[4]);
+            if (end < start) {
+                std::cerr << "End index cannot be smaller than start index. Defaulting to maximum index." << std::endl;
+                end = 9999999999999999;
+            }
+        }
+        catch (const std::exception& e) {
+            std::cerr << "Invalid end index: " << argv[4] << ". Defaulting to maximum index." << std::endl;
+            end = 9999999999999999;
+        }
+    }
+
+    bruteForce(length, filePath, totalThreads, start, end);
 
     // Cleanup
     CloseHandle(passwordFoundEvent);
