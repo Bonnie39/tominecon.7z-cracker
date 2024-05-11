@@ -36,7 +36,7 @@ void bruteForceThread(int length, const std::string &filePath, int threadId, int
 
         std::string combinationString = std::to_string(combination);
         combinationString = (std::string(length - combinationString.length(), '0') + combinationString);
-        combinationString.erase(0, combinationString.find_first_not_of('0'));
+        //combinationString.erase(0, combinationString.find_first_not_of('0'));
 
         std::string command = "7z x -p" + combinationString + " \"" + filePath + "\" -y > /dev/null 2>&1";
         int result = system(command.c_str());
@@ -50,8 +50,9 @@ void bruteForceThread(int length, const std::string &filePath, int threadId, int
         if (exitStatus == 0) {
             std::lock_guard<std::mutex> lock(consoleMutex);
             std::cout << "Password correctly identified by thread " << threadId << std::endl;
-            FINAL_MESSAGE = "Thread " + std::to_string(threadId) + ": Password found: " + combinationString;
-            FINAL_COLOR = GREEN;
+            std::cout << "Password: " << combinationString << std::endl;
+            //FINAL_MESSAGE = "Thread " + std::to_string(threadId) + ": Password found: " + combinationString;
+            //FINAL_COLOR = GREEN;
             passwordFound.store(true);
             passwordFoundCondition.notify_all();
             std::exit(0);
@@ -76,7 +77,7 @@ void bruteForce(int length, const std::string &filePath, int totalThreads) {
         thread.join();
     }
 
-    finalMessage(FINAL_MESSAGE, FINAL_COLOR);
+    //finalMessage(FINAL_MESSAGE, FINAL_COLOR);
 }
 
 int main(int argc, char *argv[]) {
